@@ -10,7 +10,8 @@
 #endif
 
 #include "config.h"
-#include "platform.h"
+#include "MCU.h"
+#include "FsTS.h"
 #include <SPI.h>
 #include "SdFat.h"
 #include "Adafruit_SPIFlash.h"
@@ -18,7 +19,8 @@
 #include <diskio.h>
 #include <AnimatedGIF.h>
 #include <PNGdec.h>
-#include "mutex"
+
+extern MCU mcu;
 
 // Un-comment to run with custom flash storage
 // #define FLASHFS_CUSTOM_CS   A5
@@ -247,7 +249,7 @@ static void setupSD(void)
 {
 	Serial.println("Setting up SD storage");
 
-	SdSpiConfig spiConfig = getSdSpiConfig();
+	SdSpiConfig spiConfig = mcu.getSdSpiConfig();
 
 	if (!sdfs.begin(spiConfig))
 	{
@@ -255,7 +257,7 @@ static void setupSD(void)
 		return;
 	}
 
-	FsFileTS root = sdfs.open("/", O_RDONLY);
+	FsFile root = sdfs.open("/", O_RDONLY);
 	if (root)
 	{
 		if (root.isDir())
@@ -286,9 +288,9 @@ void setupStorage(void)
 	if (hasSD || hasFlash)
 	{
 		if (hasSD)
-			volume = FsVolumeTS(sdfs.vol());
+			volume = FsVolumeTS(sdfs.vol(), &mcu);
 		else
-			volume = FsVolumeTS(&flashfs);
+			volume = FsVolumeTS(&flashfs, &mcu);
 
 		loadConfig();
 	}

@@ -2,9 +2,8 @@
 #define DISPLAY_H
 
 #include "config.h"
-#include "definitions.h"
 #include "storage.h"
-#include "platform.h"
+#include "MCU.h"
 #include <vector>
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -14,9 +13,22 @@
 
 using namespace std;
 
+extern Commander cmd;
+
 #define DISABLE_COLOR_MIXING 0xffffffff
 
 #define DISPLAY_TEXT_MARGIN 4
+
+typedef enum DisplayState {
+	DISPLAY_ANIMATED_GIF,
+	DISPLAY_ANIMATED_GIF_LOOPING,
+	DISPLAY_MISTER,
+	DISPLAY_RANDOM_SHAPES,
+	DISPLAY_SLIDESHOW,
+	DISPLAY_STATIC_IMAGE,
+	DISPLAY_STATIC_TEXT,
+	DISPLAY_SYSTEM_INFORMATION,
+} DisplayState;
 
 const char *imageExtensions[] = {
 	".loop.gif",
@@ -386,19 +398,19 @@ void showSystemInfo(uint32_t frameTime)
 	lines.push_back("v" + String(TTY2PICO_VERSION_STRING));
 	lines.push_back(TTY2PICO_BOARD);
 
-	snprintf(lineBuffer, sizeof(lineBuffer), "RP2040 @ %.1fMHz %.1fC", getCpuSpeedMHz(), getCpuTemperature());
+	snprintf(lineBuffer, sizeof(lineBuffer), "RP2040 @ %.1fMHz %.1fC", mcu.getCpuSpeedMHz(), mcu.getCpuTemperature());
 	lines.push_back(lineBuffer);
 
 	memset(lineBuffer, 0, sizeof(lineBuffer));
-	snprintf(lineBuffer, sizeof(lineBuffer), "%s @ %dx%d %.1fMHz", TTY2PICO_DISPLAY, config.getDisplayWidth(), config.getDisplayHeight(), getSpiRateDisplayMHz());
+	snprintf(lineBuffer, sizeof(lineBuffer), "%s @ %dx%d %.1fMHz", TTY2PICO_DISPLAY, config.getDisplayWidth(), config.getDisplayHeight(), mcu.getSpiRateDisplayMHz());
 	lines.push_back(lineBuffer);
 
-	lines.push_back(String(getTime(DTF_HUMAN)));
+	lines.push_back(String(mcu.getTime(DTF_HUMAN)));
 
 	if (getHasSD())
 	{
 		memset(lineBuffer, 0, sizeof(lineBuffer));
-		snprintf(lineBuffer, sizeof(lineBuffer), "SD Filesystem @ %.1fMHz", getSpiRateSdMHz());
+		snprintf(lineBuffer, sizeof(lineBuffer), "SD Filesystem @ %.1fMHz", mcu.getSpiRateSdMHz());
 		lines.push_back(lineBuffer);
 	}
 	else lines.push_back("Flash Filesystem");
@@ -813,12 +825,8 @@ void showMister(void)
 
 void showStartup(void)
 {
-	if (config.startupCommand != "")
-	{
-		CommandData command = CommandData::parseCommand(config.startupCommand);
-		addToQueue(command);
-	}
-	else
+	CommandData data = cmd.process(config.startupCommand);
+	if (data.command == TTY2CMD_NONE)
 	{
 		showSystemInfo(millis());
 		delay(config.startupDelay);

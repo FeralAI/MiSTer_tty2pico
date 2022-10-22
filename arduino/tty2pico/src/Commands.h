@@ -1,11 +1,8 @@
-#ifndef DEFINITIONS_H
-#define DEFINITIONS_H
+#ifndef TTY2PICO_COMMANDS_H
+#define TTY2PICO_COMMANDS_H
 
 #include <Arduino.h>
-#include "SPI.h"
-#include "FsLib/FsVolume.h"
-#include "FsLib/FsFile.h"
-#include "SpiDriver/SdSpiDriver.h"
+#include "MCU.h"
 
 // When adding a new command do the following:
 // * Add a `const String [CMDNAME]` variable to commands.h
@@ -63,13 +60,33 @@ typedef enum TTY2CMD {
 	TTY2CMD_USBMSC,
 } TTY2CMD;
 
-struct CommandData
+class CommandData
 {
+public:
 	CommandData() { }
 	CommandData(TTY2CMD command) : command(command) { }
 	CommandData(TTY2CMD command, String commandText) : command(command), commandText(commandText) { }
 
-	static CommandData parseCommand(String command)
+	TTY2CMD command;
+	String commandText;
+};
+
+class Commander
+{
+public:
+	Commander(MCU *mcu) : mcu(mcu) { }
+
+	/* Command processing */
+	CommandData process(String command)
+	{
+		CommandData data = parseCommand(command);
+		if (data.command != TTY2CMD_NONE)
+			addToQueue(data);
+
+		return data;
+	}
+
+	CommandData parseCommand(String command)
 	{
 		String bigcmd = command;
 		bigcmd.toUpperCase();
@@ -102,116 +119,70 @@ struct CommandData
 		return CommandData(TTY2CMD_NONE, command);
 	}
 
-	TTY2CMD command;
-	String commandText;
-};
-
-
-
-typedef enum DateTimeFormat {
-	DTF_UNIX = 0,
-	DTF_HUMAN,
-} DateTimeFormat;
-
-typedef enum DisplayState {
-	DISPLAY_ANIMATED_GIF,
-	DISPLAY_ANIMATED_GIF_LOOPING,
-	DISPLAY_MISTER,
-	DISPLAY_RANDOM_SHAPES,
-	DISPLAY_SLIDESHOW,
-	DISPLAY_STATIC_IMAGE,
-	DISPLAY_STATIC_TEXT,
-	DISPLAY_SYSTEM_INFORMATION,
-} DisplayState;
-
-class SdSpiDriverT2P : public SdSpiBaseClass
-{
-public:
-	SdSpiDriverT2P();
-
-	// Activate SPI hardware with correct speed and mode.
-	void activate();
-
-	// Initialize the SPI bus.
-	void begin(SdSpiConfig config);
-	// Deactivate SPI hardware.
-	void deactivate();
-	// Receive a byte.
-	uint8_t receive();
-	// Receive multiple bytes.
-	uint8_t receive(uint8_t *buf, size_t count);
-	// Send a byte.
-	void send(uint8_t data);
-	// Send multiple bytes.
-	void send(const uint8_t *buf, size_t count);
-	// Save SPISettings for new max SCK frequency
-	void setSckSpeed(uint32_t maxSck);
-
-private:
-	SPISettings spiSettings;
-};
-
-class FsVolumeTS;
-
-class FsFileTS
-{
-public:
-	FsFileTS() { }
-	FsFileTS(File32 file) : file32(file) { }
-	FsFileTS(FsFile file) : fsFile(file) { }
-	~FsFileTS()
+	void runCommand(CommandData data)
 	{
-		if (fsFile) fsFile.close();
-		if (file32) file32.close();
+		switch (data.command)
+		{
+			case TTY2CMD_BYE:     return cmdBye();
+			case TTY2CMD_CLS:     return cmdCls();
+			case TTY2CMD_COR:     return cmdSetCore(data.commandText);
+			case TTY2CMD_DOFF:    return cmdDisplayOff();
+			case TTY2CMD_DON:     return cmdDisplayOn();
+			case TTY2CMD_ENOTA:   return cmdEnableOTA();
+			case TTY2CMD_GETSYS:  return cmdGetSysInfo();
+			case TTY2CMD_GETTIME: return cmdGetTime(data.commandText);
+			case TTY2CMD_ROT:     return cmdRotate(data.commandText);
+			case TTY2CMD_SAVER:   return cmdSaver(data.commandText);
+			case TTY2CMD_SETTIME: return cmdSetTime(data.commandText);
+			case TTY2CMD_SHSYSHW: return cmdShowSystemInfo();
+			case TTY2CMD_SWSAVER: return cmdSaver(data.commandText);
+			case TTY2CMD_SHOW:    return cmdShow(data.commandText);
+			case TTY2CMD_SHTEMP:  return cmdShowSystemInfo();
+			case TTY2CMD_SNAM:    return cmdShowCoreName();
+			case TTY2CMD_SORG:    return cmdShowSystemInfo();
+			case TTY2CMD_TEST:    return cmdTest();
+			case TTY2CMD_TXT:     return cmdText(data.commandText);
+			case TTY2CMD_UNKNOWN: return cmdUnknown(data.commandText);
+			case TTY2CMD_USBMSC:  return cmdUsbMsc();
+			case TTY2CMD_NONE:    return;
+
+			// If you get here you're missing an enum definition ^^^
+			default:
+				Serial.print("Unrecognized TTY2CMD command: ");
+				Serial.println(data.command);
+				return;
+		}
 	}
 
-	explicit operator bool() const { return file32 || fsFile; }
+	/* Platform-specific queues */
 
-	static void setActiveVolume(FsVolumeTS *volume) { activeVolume = volume; }
+	void setupQueue(void);
+	void addToQueue(CommandData &data);
+	bool removeFromQueue(CommandData &data);
+	void loopQueue(void);
 
-	bool available(void);
-	bool close(void);
-	uint8_t getError() const;
-	size_t getName(char* name, size_t len);
-	bool isDir(void);
-	FsFileTS openNextFile(void);
-	bool openNext(FsBaseFile* dir, oflag_t oflag);
-	uint64_t position(void);
-	int read(void* buf, size_t count);
-	void rewindDirectory(void);
-	bool seek(uint64_t position);
-	uint64_t size(void);
-	size_t write(const void* buf, size_t count);
-
-private:
-	static FsVolumeTS *activeVolume;
-	File32 file32;
-	FsFile fsFile;
-};
-
-class FsVolumeTS
-{
-public:
-	FsVolumeTS() { }
-	FsVolumeTS(FatVolume *vol) : flashVol(vol) { }
-	FsVolumeTS(FsVolume *vol) : sdVol(vol) { }
-	~FsVolumeTS()
-	{
-		flashVol = nullptr;
-		sdVol = nullptr;
-	}
-
-	explicit operator bool() const { return flashVol || sdVol; }
-
-	bool exists(const char *path);
-	FsFileTS open(const char *path, oflag_t oflag);
-
-	FatVolume *getFlashVol(void) { return flashVol; }
-	FsVolume *getSdVol(void) { return sdVol; }
+	/* Command actions */
+	void cmdBye(void);
+	void cmdCls(void);
+	void cmdDisplayOff(void);
+	void cmdDisplayOn(void);
+	void cmdEnableOTA();
+	void cmdGetTime(String command);
+	void cmdGetSysInfo();
+	void cmdRotate(String command);
+	void cmdSaver(String command);
+	void cmdSetCore(String command);
+	void cmdSetTime(String command);
+	void cmdShow(String command);
+	void cmdShowCoreName(void);
+	void cmdShowSystemInfo(void);
+	void cmdTest(void);
+	void cmdText(String command);
+	void cmdUnknown(String command);
+	void cmdUsbMsc();
 
 private:
-	FatVolume *flashVol;
-	FsVolume *sdVol;
+	MCU *mcu;
 };
 
 #endif

@@ -2,7 +2,7 @@
 #define USBMSC_H
 
 #include "Adafruit_TinyUSB.h"
-#include "platform.h"
+#include "MCU.h"
 #include "storage.h"
 #include "display.h"
 
@@ -39,26 +39,26 @@ static void mscFlashFlushCallback(void)
 
 static int32_t mscSDReadCallback(uint32_t lba, void* buffer, uint32_t bufsize)
 {
-	pauseBackground();
+	mcu.pauseBackground();
 	int32_t result = sdfs.card()->readSectors(lba, (uint8_t *)buffer, bufsize / FS_BLOCK_SIZE) ? bufsize : -1;
-	resumeBackground();
+	mcu.resumeBackground();
 	return result;
 }
 
 static int32_t mscSDWriteCallback(uint32_t lba, uint8_t* buffer, uint32_t bufsize)
 {
 	digitalWrite(LED_BUILTIN, HIGH);
-	pauseBackground();
+	mcu.pauseBackground();
 	int32_t result = sdfs.card()->writeSectors(lba, buffer, bufsize / FS_BLOCK_SIZE) ? bufsize : -1;
-	resumeBackground();
+	mcu.resumeBackground();
 	return result;
 }
 
 static void mscSDFlushCallback(void)
 {
-	pauseBackground();
+	mcu.pauseBackground();
 	sdfs.card()->syncDevice();
-	resumeBackground();
+	mcu.resumeBackground();
 	sdfsChanged = true;
 	digitalWrite(LED_BUILTIN, LOW);
 }

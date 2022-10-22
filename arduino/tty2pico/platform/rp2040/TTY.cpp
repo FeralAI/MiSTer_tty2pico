@@ -1,13 +1,7 @@
-#ifndef TTY_H
-#define TTY_H
-
 #include "config.h"
+#include "TTY.h"
 
-#ifndef TTY_SERIAL
-#define TTY_SERIAL Serial
-#endif
-
-void setupTTY()
+void TTY::setup()
 {
 	TTY_SERIAL.begin(config.ttyBaudRate);
 	while (config.waitForSerial && !TTY_SERIAL)
@@ -16,7 +10,7 @@ void setupTTY()
 	TTY_SERIAL.println("Serial setup complete");
 }
 
-String readTTY()
+String TTY::read()
 {
 	String command;
 
@@ -35,5 +29,3 @@ String readTTY()
 
 	return command;
 }
-
-#endif

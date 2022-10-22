@@ -1,45 +1,41 @@
-#ifndef COMMANDS_H
-#define COMMANDS_H
-
 #include "config.h"
-#include <string>
-#include "definitions.h"
-#include "platform.h"
+#include "Commands.h"
+#include "MCU.h"
 #include "display.h"
-#include "storage.h"
 #include "usbmsc.h"
 
 using namespace std;
 
 static String coreName;
+static queue_t cmdQ;
 
-static void cmdBye(void)
+void Commander::cmdBye(void)
 {
 	showMister();
 }
 
-static void cmdCls(void)
+void Commander::cmdCls(void)
 {
 	clearDisplay();
 }
 
-static void cmdDisplayOff(void)
+void Commander::cmdDisplayOff(void)
 {
 	digitalWrite(TFT_BL, LOW);
 }
 
-static void cmdDisplayOn(void)
+void Commander::cmdDisplayOn(void)
 {
 	digitalWrite(TFT_BL, HIGH);
 }
 
-static void cmdEnableOTA()
+void Commander::cmdEnableOTA()
 {
 	Serial.println("Restarting in firmware update mode");
-	resetForUpdate();
+	mcu.resetForUpdate();
 }
 
-static void cmdGetTime(String command)
+void Commander::cmdGetTime(String command)
 {
 	int format = DTF_UNIX;
 	if (command.indexOf(',') > 0)
@@ -49,11 +45,11 @@ static void cmdGetTime(String command)
 			format = DTF_HUMAN;
 	}
 
-	const char *time = getTime(format);
+	const char *time = mcu.getTime(format);
 	Serial.println(time);
 }
 
-static void cmdGetSysInfo()
+void Commander::cmdGetSysInfo()
 {
 	string info = string("version:")  + string(TTY2PICO_VERSION_STRING)
 	            + string("|board:")   + string(TTY2PICO_BOARD)
@@ -62,7 +58,7 @@ static void cmdGetSysInfo()
 	Serial.println(info.c_str());
 }
 
-static void cmdRotate(String command)
+void Commander::cmdRotate(String command)
 {
 	if (command.indexOf(',') > -1)
 	{
@@ -95,7 +91,7 @@ static void cmdRotate(String command)
 	else Serial.println("No rotation command found");
 }
 
-static void cmdSaver(String command)
+void Commander::cmdSaver(String command)
 {
 	DisplayState lastDisplayState = getDisplayState();
 	if (command.indexOf(',') > -1 && command.length() > 9)
@@ -114,7 +110,7 @@ static void cmdSaver(String command)
 	}
 }
 
-static void cmdSetCore(String command)
+void Commander::cmdSetCore(String command)
 {
 	if (command.startsWith(CMDCORE))
 		coreName = command.substring(command.indexOf(',') + 1, command.length());
@@ -147,34 +143,34 @@ static void cmdSetCore(String command)
 	}
 }
 
-static void cmdSetTime(String command)
+void Commander::cmdSetTime(String command)
 {
 	if (command.indexOf(",") > 0)
 	{
 		String unixTimestamp = command.substring(command.indexOf(",") + 1);
 		uint32_t timestamp = unixTimestamp.toInt();
-		setTime(timestamp);
+		mcu.setTime(timestamp);
 	}
 	else Serial.println("Cannot set date and time, no data received");
 }
 
-static void cmdShow(String command)
+void Commander::cmdShow(String command)
 {
 	String path = command.substring(command.indexOf(',') + 1);
 	showImage(path);
 }
 
-static void cmdShowCoreName(void)
+void Commander::cmdShowCoreName(void)
 {
 	showText(coreName);
 }
 
-static void cmdShowSystemInfo(void)
+void Commander::cmdShowSystemInfo(void)
 {
 	showSystemInfo(millis());
 }
 
-static void cmdTest(void)
+void Commander::cmdTest(void)
 {
 	showText("Starting test in..."); delay(2000);
 	showText("3"); delay(1000);
@@ -191,7 +187,7 @@ static void cmdTest(void)
 	delay(3000);
 }
 
-static void cmdText(String command)
+void Commander::cmdText(String command)
 {
 	String displayText;
 	if (command.startsWith(CMDTXT))
@@ -202,7 +198,7 @@ static void cmdText(String command)
 	showText(displayText);
 }
 
-static void cmdUnknown(String command)
+void Commander::cmdUnknown(String command)
 {
 #if VERBOSE_OUTPUT == 1
 	Serial.print("Received unknown command: "); Serial.println(command);
@@ -210,7 +206,7 @@ static void cmdUnknown(String command)
 	showText(command);
 }
 
-static void cmdUsbMsc()
+void Commander::cmdUsbMsc()
 {
 	if (!getMscReady())
 	{
@@ -219,42 +215,22 @@ static void cmdUsbMsc()
 	}
 }
 
-void runCommand(CommandData data)
+void Commander::setupQueue(void)
 {
-	switch (data.command)
-	{
-		case TTY2CMD_BYE:     return cmdBye();
-		case TTY2CMD_CLS:     return cmdCls();
-		case TTY2CMD_COR:     return cmdSetCore(data.commandText);
-		case TTY2CMD_DOFF:    return cmdDisplayOff();
-		case TTY2CMD_DON:     return cmdDisplayOn();
-		case TTY2CMD_ENOTA:   return cmdEnableOTA();
-		case TTY2CMD_GETSYS:  return cmdGetSysInfo();
-		case TTY2CMD_GETTIME: return cmdGetTime(data.commandText);
-		case TTY2CMD_ROT:     return cmdRotate(data.commandText);
-		case TTY2CMD_SAVER:   return cmdSaver(data.commandText);
-		case TTY2CMD_SETTIME: return cmdSetTime(data.commandText);
-		case TTY2CMD_SHSYSHW: return cmdShowSystemInfo();
-		case TTY2CMD_SWSAVER: return cmdSaver(data.commandText);
-		case TTY2CMD_SHOW:    return cmdShow(data.commandText);
-		case TTY2CMD_SHTEMP:  return cmdShowSystemInfo();
-		case TTY2CMD_SNAM:    return cmdShowCoreName();
-		case TTY2CMD_SORG:    return cmdShowSystemInfo();
-		case TTY2CMD_TEST:    return cmdTest();
-		case TTY2CMD_TXT:     return cmdText(data.commandText);
-		case TTY2CMD_UNKNOWN: return cmdUnknown(data.commandText);
-		case TTY2CMD_USBMSC:  return cmdUsbMsc();
-		case TTY2CMD_NONE:    return;
-
-		// If you get here you're missing an enum definition ^^^
-		default:
-			Serial.print("Unrecognized TTY2CMD command: ");
-			Serial.println(data.command);
-			return;
-	}
+	queue_init(&cmdQ, sizeof(CommandData), 1);
 }
 
-void loopQueue(void)
+void Commander::addToQueue(CommandData &data)
+{
+	queue_try_add(&cmdQ, &data);
+}
+
+bool Commander::removeFromQueue(CommandData &data)
+{
+	return queue_try_remove(&cmdQ, &data);
+}
+
+void Commander::loopQueue(void)
 {
 	static CommandData data;
 
@@ -266,5 +242,3 @@ void loopQueue(void)
 		runCommand(data);
 	}
 }
-
-#endif
