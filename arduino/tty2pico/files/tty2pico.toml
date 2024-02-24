@@ -1,0 +1,14 @@
+title = "tty2pico Configuration"
+
+[tty2pico]
+backgroundColor = 0
+cpuBoost = true
+imagePath = "/logos/"
+sdMode = 0
+startupCommand = ""
+startupDelay = 0
+startupImage = "/game.png"
+slideshowDelay = 5000
+slideshowFolder = "/logos/"
+uncapFramerate = false
+missingCoreImage = "startup"
