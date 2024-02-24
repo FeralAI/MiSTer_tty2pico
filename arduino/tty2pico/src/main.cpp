@@ -30,7 +30,8 @@ void setup()
 	setupQueue();           // Set up task queue
 
 	setDirectory(config.imagePath); // Set the working image path
-	showStartup();
+	// showStartup();
+	showGameImage();
 }
 
 void loop()

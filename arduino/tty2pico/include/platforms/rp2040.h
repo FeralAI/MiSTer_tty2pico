@@ -6,7 +6,7 @@
 #include "SPI.h"
 #include "api/HardwareSPI.h"
 #include "SpiDriver/SdSpiDriver.h"
-#include "TFT_eSPI.h"
+#include "Processors/TFT_eSPI_RP2040.h"
 #include "hardware/dma.h"
 #include "hardware/rtc.h"
 #include "hardware/spi.h"
@@ -326,11 +326,12 @@ void SdSpiDriverT2P::begin(SdSpiConfig config)
 	spi_deinit(sdSpi);
 
 	setSckSpeed(config.maxSck);
+
+	spi_init(sdSpi, spiSettings.getClockFreq());
+
 	sdCpol = get_cpol(spiSettings.getDataMode());
 	sdCpha = get_cpha(spiSettings.getDataMode());
 	sdBitOrder = spiSettings.getBitOrder() == MSBFIRST ? SPI_MSB_FIRST : SPI_LSB_FIRST;
-
-	spi_init(sdSpi, spiSettings.getClockFreq());
 	spi_set_format(sdSpi, 8, sdCpol, sdCpha, sdBitOrder);
 
 	gpio_set_function(SDCARD_MISO_PIN, GPIO_FUNC_SPI);

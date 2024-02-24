@@ -55,8 +55,14 @@ def main():
 					displaySection = parsePIOSection(displayFile)
 
 					envName = boardName + '-' + displayName
+					if (envName == 'PicoResTouch28-ST7789VW'):
+						envName = 'PicoResTouch28'
 					if (envName == 'RoundyPi-GC9A01'):
 						envName = 'RoundyPi'
+					if (envName == 'RP2040LCD128-GC9A01'):
+						envName = 'RP2040LCD128'
+					if (envName == 'RP2040TouchLCD128-GC9A01'):
+						envName = 'RP2040TouchLCD128'
 
 					boardOptions = list(set(boardSection.options) - set(displaySection.options))
 					displayOptions = list(set(displaySection.options) - set(boardSection.options))
@@ -84,7 +90,13 @@ def main():
 						envFile.write('upload_port = .pio/build/' + envName + '/\n')
 
 	# Remove any unneeded envs that were generated
+	for file in glob(path.join(envsDir, 'PicoResTouch28-*.ini')):
+		remove(file)
 	for file in glob(path.join(envsDir, 'RoundyPi-*.ini')):
+		remove(file)
+	for file in glob(path.join(envsDir, 'RP2040LCD128-*.ini')):
+		remove(file)
+	for file in glob(path.join(envsDir, 'RP2040TouchLCD128-*.ini')):
 		remove(file)
 
 
